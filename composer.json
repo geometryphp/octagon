@@ -1,0 +1,15 @@
+{
+    "name": "gmtry/octagon",
+    "description": "The muscle of the Geometry framework, providing the components to help bring the framework alive",
+    "keywords": ["php", "framework", "octagon"],
+    "homepage": "https://github.com/gmtry/octagon",
+    "type": "library",
+    "require": {
+        "php": ">=5.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Octagon\\": "src/Octagon"
+        }
+    }
+}
