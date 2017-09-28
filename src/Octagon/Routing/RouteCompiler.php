@@ -8,7 +8,6 @@ use Octagon\Core\Register;
 /**
  * Compiles a route into a CompiledRoute.
  */
-
 class RouteCompiler
 {
     const STATIC_TEXT_REGEX = '[^\{\}]+';
@@ -108,7 +107,7 @@ class RouteCompiler
      * @param Route $route     The route to use.
      * @param string $pattern  The pattern to compiled.
      *
-     * @return Array Returns an array with the compiled regex, and the extracted variables if any.
+     * @return Array Returns an array with the compiled regex, and the extracted variable identifiers if any.
      */
     public static function compilePattern(Route $route, $pattern)
     {
@@ -132,9 +131,9 @@ class RouteCompiler
          *
          * - Any text in the pattern that is not a macro is referred to as **static text**.
          *
-         * - **expansion input**
+         * - **expansion input** - TBD
          *
-         * - **expansion output**
+         * - **expansion output** - TBD
          *
          * - **Extrapolation** is the process of retrieving the expansion input
          *   and forming an expansion output. This is the glue that maps the
@@ -170,28 +169,35 @@ class RouteCompiler
         $regex = '';           // used to store the compiled regex
         $variables = array();  // stores variables
 
-        // What separates tokens in a pattern? It is common in programming languages
-        // for tokens to be separated by whitespaces. Well, since macro tokens are
-        // already enclosed with the {} characters, these characters should help
-        // delimit static text from macros.
-        $staticText = self::STATIC_TEXT_REGEX;                       // collects static-text token
-        $macro = self::MACRO_REGEX;                                  // collects macro token
-        $separator = self::SEPARATOR_REGEX;                          // collects the separator, and helps delimit the static text from macro
+        // We need to know how tokens are delimited in a pattern so that we can
+        // know how to go about breaking down a pattern into tokens. So we ask,
+        // What characters help to delimits tokens from static-text in a pattern?
+        // Since macro tokens are already enclosed with the `{}` characters,
+        // then these characters shall delimit static text from macros.
+        $staticText = self::STATIC_TEXT_REGEX;                 // collects static-text token
+        $macro = self::MACRO_REGEX;                            // collects macro token
+        $separator = self::SEPARATOR_REGEX;                    // collects the separator, and helps delimit the static text from macro
         $tokenizer = "#{$macro}|{$staticText}|{$separator}#";  // splits string into tokens
 
-        // split the pattern into tokens
+        // Next, we break the pattern into tokens. With the pattern broken down
+        // into tokens, we can process the pattern more easily
         preg_match_all($tokenizer, $pattern, $matches, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
+
+        // For each token we find, we shall process it accordinly and build up
+        // a regex string and a list of all variable identifiers that were
+        // found in the given pattern.
         foreach ($matches as $index=>$match) {
-            // If this token is a macro, let us process it.
+
+            // Let's process a macro
             if (self::isMacro($match[0][0])) { //if (preg_match("#^{$macro}$#", $match[0][0])) {
                 // Our aim at this point is to expand the macro.
                 //
                 // The expansion output of a macro token is extrapolated from one of
-                // two places: the requirements settings of the route, or the pattern
-                // compiler itself.
+                // two places: the requirements settings of the given route,
+                // or the pattern compiler itself.
                 //
-                // To expand the var, the pattern compiler first checks for the requirements
-                // settings of the route. If no requirement is found, then the pattern
+                // To expand the var (macro), the pattern compiler first checks for the requirements
+                // settings of the given route. If no requirement is found, then the pattern
                 // compiler uses its default regex.
                 //
                 // When checking the requirements settings of the route, the pattern compiler
@@ -201,25 +207,26 @@ class RouteCompiler
                 // with the default regex.
 
                 // First, get identifier of the variable, and store it away
-                $variable = substr($match[0][0], 1, -1);
+                // The pattern compiler returns the identifiers of the variables
+                // to the caller.
+                $variable = self::extractVariableName($match[0][0]);
                 $variables[] = $variable;
 
-                // Then, get the variable's requirement settings from the route. If this route
-                // has a requirement setting for the variable, extrapolate the setting
-                // from the route, and name the capture group the same as the variable name.
+                // Then, get the variable's requirement settings from the given route. If this route
+                // has a requirement setting for the variable, then the extrapolate the settings
+                // from the route, and give the capture group the same name as the variable.
                 if (!empty($requirement = $route->getRequirement($variable))) {
                     $regex .= sprintf('(?P<%s>%s)', $variable, $requirement);
                 }
-                // But if the route doesn't have a requirement defined for the variable,
-                // use the default regex.
+                // However if the route does not have a defined requirement for the variable,
+                // then use the pattern compiler's default regex.
                 else {
-                    // The default regex expresses for the regex interpreter to collect
-                    // any character until it encounters the delimiter character. The delimiter
-                    // is usually the first character of the next static-text token, except
-                    // when the macro token is the last token.
-
-                    // If there are more tokens ahead, let's use the first character of
-                    // the next token as a delimiter; the next token must be a static text.
+                    // The default regex instructs the regex interpreter to collect any character until
+                    // it encounters the delimiter character. The delimiter is usually the first
+                    // character of the next static-text token, except when the macro token is the last token.
+                    //
+                    // If there are more tokens ahead, then use the first character of  the next token
+                    // as a delimiter; but be mindful: the next token must be a static text.
                     if (array_key_exists($index+1, $matches)) {
                         $nextToken = $matches[$index+1][0][0];
                         if (!self::isMacro($nextToken)) { //if (!preg_match("#^{$macro}$#", $nextToken)) {
@@ -236,15 +243,16 @@ class RouteCompiler
                     }
                 }
             }
-            // But if the token is not a macro, then the token is static text.
-            // The expansion output of a static-text token is extrapolated from the
-            // static-text token itself. The static-text token is evaluated for escapes
-            // and the evaluated value becomes the token's expansion output.
+            // The token is not a macro; therefore it must be static text. The expansion output
+            // of a static-text token is extrapolated from the static-text token itself.
+            // Not much expansion is done to static text. The static-text token is only evaluated
+            // for escapes. The evaluation result is returned as the expansion output.
             else {
                 $staticText = $match[0][0];
                 $staticText = preg_quote($staticText);
                 $regex .= $staticText;
             }
+
         }
 
         return array (
@@ -328,18 +336,30 @@ class RouteCompiler
      * @return string Returns a string with substituted values. If no value is
      *   supplied in $args, then the string is returned as is.
      */
-    public static function subPatternArgs($pattern, $args = array())
+    public static function substitutePatternArgs($pattern, $args = array())
     {
         // Check the given pattern for variables. For each variable found,
         // extract the variable name and get substitue value from $args
         // by the variable name.
         $macro = self::MACRO_REGEX;
         return preg_replace_callback("#{$macro}#", function($matches) use ($args) {
-                $variable = substr($matches[0], 1, -1); // remove the curly brackets to get the variable identifier
+                $variable = self::extractVariableName($matches[0]);
                 return isset($args[$variable]) ? $args[$variable] : $matches[0] ;
             },
             $pattern
         );
+    }
+
+    /**
+     * Extract the variable name from the macro token
+     *
+     * @param string $token The macro token from which to extract variable name
+     *
+     * @return string Returns the extracted name.
+     */
+    public static function extractVariableName($token) {
+        // Remove the curly brackets to get the variable identifier
+        return substr($token, 1, -1);
     }
 
 }

@@ -165,28 +165,45 @@ class Registry
 
             /**
              * @param string $name
-             * @param array $options
+             * @param array $args
              * @param bool $full
              */
-            $getUrl = function($name, array $options = array(), $full) {
-                // Prepare the query
+            $getUrl = function($name, array $args = array(), $full) {
+                // These vars stores options for later when they are joined to the URL
                 $query = array();
-                if (array_key_exists('_query', $options)) {
-                    if (is_array($options['_query'])) {
-                        $query = $options['_query'];
-                    }
-                    else {
-                        // TODO: throw error here: query must be array.
-                    }
-                    unset($options['_query']); // remove query from options
-                }
-
-                // Prepare fragment
                 $fragment = '';
-                // We use isset in place of array_key_exists for optimization reasons.
-                if (isset($options['_fragment']) && !is_array($options['_fragment'])) {
-                    $fragment = $options['_fragment'];
-                    unset($options['_fragment']); // remove query from options
+
+                // There are special options hidden in the args variable.
+                // We need to pass these options as part of the URL.
+                // If there are any options, lets process them.
+                // We shall remove any options from the args variable,
+                // and leave only the args.
+                if (array_key_exists(0, $args)) {
+                    // Because Twig stores the actual array in an array at index 0,
+                    // simplify life and make the access to the array with the variables easy.
+                    $args = $args[0];
+                    // Prepare the query
+                    if (array_key_exists('_query', $args)) {
+                        if (is_array($args['_query'])) {
+                            $query = $args['_query'];
+                        }
+                        else {
+                            // TODO: throw error here: query must be array.
+                        }
+                        unset($args['_query']); // remove query from the args
+                    }
+
+                    // Prepare fragment
+                    // We use isset() in place of array_key_exists for optimization reasons.
+                    if (isset($args['_fragment'])) {
+                        if (!is_array($args['_fragment'])) {
+                            $fragment = $args['_fragment'];
+                        }
+                        else {
+                            // TODO: throw error here: query cannot be an array
+                        }
+                        unset($args['_fragment']); // remove fragment
+                    }
                 }
 
                 // Prepare URL
@@ -197,7 +214,7 @@ class Registry
                 // Get the URL from the router.
                 $registry = self::getInstance();
                 $router = $registry->getRouter();
-                $result = $router->url($url, $options, $full); // we pass $options as the args.
+                $result = $router->url($url, $args, $full);
                 if (empty($result)) {
                     return '';
                 }
@@ -218,15 +235,15 @@ class Registry
             //     a route named `get.foo.bar` has the path `foo/{id}`; when we use
             //     `url("get.foo.bar", id = 1234)`, the output is `foo/1234`. We use variadic functions
             //     so that any variable number of variables and arguments can be supplied to url().
-            $this->_twig->addFunction(new \Twig_SimpleFunction('url', function ($name, array $options = array()) use ($getUrl) {
-                    return $getUrl($name, $options, true);
+            $this->_twig->addFunction(new \Twig_SimpleFunction('url', function ($name, array $args = array()) use ($getUrl) {
+                    return $getUrl($name, $args, true);
                 }, array('is_variadic'=>true))
             );
 
             // Define path()
             // (Documentation is the same as url(). See url()).
-            $this->_twig->addFunction(new \Twig_SimpleFunction('path', function($name, array $options = array()) use ($getUrl) {
-                    return $getUrl($name, $options, false);
+            $this->_twig->addFunction(new \Twig_SimpleFunction('path', function($name, array $args = array()) use ($getUrl) {
+                    return $getUrl($name, $args, false);
                 }, array('is_variadic'=>true))
             );
 

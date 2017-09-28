@@ -271,7 +271,8 @@ class Router
             }
 
             // Build path
-            $path = RouteCompiler::subPatternArgs($route->getPath(), $args);
+
+            $path = RouteCompiler::substitutePatternArgs($route->getPath(), $args);
 
             // Build query string
             if (!isset($url['?']) || empty($url['?'])) {
@@ -304,7 +305,7 @@ class Router
 
                 // Build host
                 if ($route->hasHost()) {
-                    $host = RouteCompiler::subPatternArgs($route->getHost(), $args);
+                    $host = RouteCompiler::substitutePatternArgs($route->getHost(), $args);
                 }
                 // If no host is specified, use the request host
                 else {
