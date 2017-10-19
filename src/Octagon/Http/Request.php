@@ -83,24 +83,24 @@ class Request
     /**
      * Create new Request instance.
      *
-     * @var array $query   Expects $_GET
+     * @var array $queries Expects $_GET
      * @var array $request Expects $_POST
      * @var array $server  Expects $_SERVER
      * @var array $files   Expects $_FILES
-     * @var array $cookies  Expects $_COOKIE
+     * @var array $cookies Expects $_COOKIE
      * @var array $headers Expects $_HEADERS?
      *
      * @return void
      */
-    public function __construct($query = array(), $request = array(), $server = array(), $files = array(), $cookies = array(), $headers = array())
+    public function __construct($queries = array(), $request = array(), $server = array(), $files = array(), $cookies = array(), $headers = array())
     {
-        $this->initialize($query, $request, $server, $files, $cookies, $headers);
+        $this->initialize($queries, $request, $server, $files, $cookies, $headers);
     }
 
     /**
      * Initialize Request.
      *
-     * @var array $query
+     * @var array $queries
      * @var array $request
      * @var array $server
      * @var array $files
@@ -109,10 +109,10 @@ class Request
      *
      * @return void
      */
-    public function initialize($query = array(), $request = array(), $server = array(), $files = array(), $cookies = array(), $headers = array())
+    public function initialize($queries = array(), $request = array(), $server = array(), $files = array(), $cookies = array(), $headers = array())
     {
-        if ($query !== null) {
-            $this->setQuery(new Bag($query));
+        if ($queries !== null) {
+            $this->setQueries(new Bag($queries));
         }
         if ($request !== null) {
             $this->setRequest(new Bag($request));
@@ -373,7 +373,7 @@ class Request
      *
      * @return void
      */
-    public function setQuery($query)
+    public function setQueries($query)
     {
         $this->_query = $query;
     }
@@ -383,9 +383,46 @@ class Request
      *
      * @return \Octagon\Adt\Bag
      */
-    public function getQuery()
+    public function getQueries()
     {
         return $this->_query;
+    }
+
+    /**
+    * Get or set a query.
+    *
+    * @return String
+    */
+    public function query($name, $value = null)
+    {
+        if (!$this->hasQuery($name)) {
+            return null;
+        }
+
+        $queries = $this->getQueries();
+
+        // Get the query if no value is defined.
+        if ($value === null) {
+            return $queries->get($name);
+        }
+        // Set the specified query using the specified value.
+        else {
+            $queries->set($name, $value);
+            $this->setQueries($queries);
+        }
+    }
+
+    /**
+    */
+    public function hasQuery($name)
+    {
+        $queries = $this->getQueries();
+        if (array_key_exists($name, $queries->all())) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     /**
